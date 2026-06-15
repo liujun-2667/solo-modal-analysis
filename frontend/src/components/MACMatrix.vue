@@ -132,6 +132,7 @@ const loadSecondSet = () => {
 }
 
 const showTooltip = (value: number, i: number, j: number, event: MouseEvent) => {
+    hideTooltip()
     const tooltip = document.createElement('div')
     tooltip.className = 'mac-tooltip'
     tooltip.textContent = `MAC(${i + 1}, ${j + 1}) = ${value.toFixed(4)}`
@@ -141,10 +142,8 @@ const showTooltip = (value: number, i: number, j: number, event: MouseEvent) => 
 }
 
 const hideTooltip = () => {
-    const tooltip = document.querySelector('.mac-tooltip')
-    if (tooltip) {
-        tooltip.remove()
-    }
+    const tooltips = document.querySelectorAll('.mac-tooltip')
+    tooltips.forEach(tooltip => tooltip.remove())
 }
 </script>
 

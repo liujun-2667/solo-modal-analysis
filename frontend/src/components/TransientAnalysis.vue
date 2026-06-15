@@ -204,7 +204,8 @@ const startAnimation = () => {
             emit('animationUpdate', transientResult.value.allDisplacements[currentTimeIndex.value])
         }
 
-        animationId = requestAnimationFrame(animate)
+        const delay = Math.max(10, 100 / animationSpeed.value)
+        animationId = window.setTimeout(animate, delay)
     }
 
     animate()
@@ -215,14 +216,14 @@ const toggleAnimation = () => {
     if (isAnimating.value) {
         startAnimation()
     } else if (animationId) {
-        cancelAnimationFrame(animationId)
+        clearTimeout(animationId)
     }
 }
 
 const resetAnimation = () => {
     isAnimating.value = false
     if (animationId) {
-        cancelAnimationFrame(animationId)
+        clearTimeout(animationId)
     }
     currentTimeIndex.value = 0
     if (transientResult.value?.allDisplacements[0]) {
