@@ -128,7 +128,8 @@ func ComputeLocalStiffnessMatrix(section model.Section, length float64) *Matrix 
     EI_L2 := E * Ix / (length * length)
     EI_L := E * Ix / length
     
-    GJ_L := E * Iy / (2 * (1 + section.Nu) * length)
+    G := E / (2 * (1 + section.Nu))
+    GJ_L := G * Iy / length
     
     k.Set(0, 0, EA_L)
     k.Set(0, 6, -EA_L)
@@ -197,30 +198,64 @@ func ComputeLocalMassMatrix(section model.Section, length float64) *Matrix {
     Ix := section.Ix
     Iy := section.Iy
     mass := rho * A * length
+    L := length
     
     m.Set(0, 0, mass/2)
+    m.Set(0, 6, mass/2)
+    m.Set(6, 0, mass/2)
     m.Set(6, 6, mass/2)
     
-    m.Set(1, 1, mass/2)
-    m.Set(7, 7, mass/2)
+    m.Set(1, 1, 13*mass/35)
+    m.Set(1, 2, 11*mass*L/210)
+    m.Set(1, 4, -11*mass*L/210)
+    m.Set(1, 7, 9*mass/70)
+    m.Set(1, 8, -13*mass*L/420)
+    m.Set(1, 10, -9*mass*L/420)
     
-    m.Set(2, 2, mass/2)
-    m.Set(8, 8, mass/2)
+    m.Set(2, 1, 11*mass*L/210)
+    m.Set(2, 2, mass*L*L/105)
+    m.Set(2, 4, mass*L*L/140)
+    m.Set(2, 7, -11*mass*L/420)
+    m.Set(2, 8, -mass*L*L/140)
+    m.Set(2, 10, mass*L*L/210)
     
-    m.Set(3, 3, rho*Ix)
-    m.Set(9, 9, rho*Ix)
+    m.Set(3, 3, rho*Ix/3)
+    m.Set(3, 9, rho*Ix/6)
+    m.Set(9, 3, rho*Ix/6)
+    m.Set(9, 9, rho*Ix/3)
     
-    m.Set(4, 4, rho*Iy)
-    m.Set(10, 10, rho*Iy)
+    m.Set(4, 1, -11*mass*L/210)
+    m.Set(4, 2, mass*L*L/140)
+    m.Set(4, 4, mass*L*L/105)
+    m.Set(4, 7, 11*mass*L/420)
+    m.Set(4, 8, mass*L*L/210)
+    m.Set(4, 10, -mass*L*L/140)
     
-    m.Set(5, 5, rho*Iy)
-    m.Set(11, 11, rho*Iy)
+    m.Set(5, 5, rho*Iy/3)
+    m.Set(5, 11, rho*Iy/6)
+    m.Set(11, 5, rho*Iy/6)
+    m.Set(11, 11, rho*Iy/3)
     
-    m.Set(1, 7, mass/2)
-    m.Set(7, 1, mass/2)
+    m.Set(7, 1, 9*mass/70)
+    m.Set(7, 2, -11*mass*L/420)
+    m.Set(7, 4, 11*mass*L/420)
+    m.Set(7, 7, 13*mass/35)
+    m.Set(7, 8, -11*mass*L/210)
+    m.Set(7, 10, 11*mass*L/210)
     
-    m.Set(2, 8, mass/2)
-    m.Set(8, 2, mass/2)
+    m.Set(8, 1, -13*mass*L/420)
+    m.Set(8, 2, -mass*L*L/140)
+    m.Set(8, 4, mass*L*L/210)
+    m.Set(8, 7, -11*mass*L/210)
+    m.Set(8, 8, mass*L*L/105)
+    m.Set(8, 10, -mass*L*L/140)
+    
+    m.Set(10, 1, -9*mass*L/420)
+    m.Set(10, 2, mass*L*L/210)
+    m.Set(10, 4, -mass*L*L/140)
+    m.Set(10, 7, 11*mass*L/210)
+    m.Set(10, 8, -mass*L*L/140)
+    m.Set(10, 10, mass*L*L/105)
     
     return m
 }
@@ -233,7 +268,7 @@ func ComputeTransformationMatrix(node1, node2 model.Node) *Matrix {
     dz := node2.Z - node1.Z
     length := math.Sqrt(dx*dx + dy*dy + dz*dz)
     
-    if length == 0 {
+    if length < 1e-10 {
         for i := 0; i < 12; i++ {
             T.Set(i, i, 1)
         }
@@ -245,20 +280,30 @@ func ComputeTransformationMatrix(node1, node2 model.Node) *Matrix {
     nz := dz / length
     
     var sx, sy, sz float64
-    if math.Abs(nx) > math.Abs(ny) && math.Abs(nx) > math.Abs(nz) {
+    if math.Abs(nx) < math.Abs(ny) && math.Abs(nx) < math.Abs(nz) {
+        sx = nz
+        sy = 0
+        sz = -nx
+    } else if math.Abs(ny) < math.Abs(nx) && math.Abs(ny) < math.Abs(nz) {
         sx = 0
         sy = nz
         sz = -ny
     } else {
-        sx = nz
-        sy = 0
-        sz = -nx
+        sx = ny
+        sy = -nx
+        sz = 0
     }
     
     slen := math.Sqrt(sx*sx + sy*sy + sz*sz)
-    sx /= slen
-    sy /= slen
-    sz /= slen
+    if slen < 1e-10 {
+        sx = 1
+        sy = 0
+        sz = 0
+    } else {
+        sx /= slen
+        sy /= slen
+        sz /= slen
+    }
     
     tx := ny*sz - nz*sy
     ty := nz*sx - nx*sz

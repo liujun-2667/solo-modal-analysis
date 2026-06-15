@@ -2,17 +2,16 @@ FROM golang:1.21-alpine AS backend-build
 
 WORKDIR /app
 
-COPY backend/go.mod backend/go.sum ./
-RUN go mod download
-
 COPY backend/ .
+RUN go mod tidy && go mod download
 RUN go build -o modal-analysis .
 
 FROM node:20-alpine AS frontend-build
 
 WORKDIR /app
 
-COPY frontend/package.json frontend/package-lock.json ./
+COPY frontend/package.json ./
+COPY .npmrc ./
 RUN npm install
 
 COPY frontend/ .

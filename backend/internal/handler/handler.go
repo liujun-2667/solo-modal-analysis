@@ -185,7 +185,7 @@ func LoadPreset(c *gin.Context) {
     eigenPairs, _ := solver.SolveEigenvalue(K, M, numModes)
 
     var modalResults []model.ModalResult
-    for i, pair := range eigenPairs {
+    for _, pair := range eigenPairs {
         freqHz := math.Sqrt(pair.Eigenvalue) / (2 * math.Pi)
         
         isRigidBody := false

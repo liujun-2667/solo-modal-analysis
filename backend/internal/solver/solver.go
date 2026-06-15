@@ -106,7 +106,12 @@ func SolveEigenvalue(K, M *Matrix, numModes int) ([]EigenPair, error) {
     
     D := make([]float64, n)
     for i := 0; i < n; i++ {
-        D[i] = 1.0 / math.Sqrt(M.At(i, i))
+        mii := M.At(i, i)
+        if mii < 1e-15 {
+            D[i] = 0
+        } else {
+            D[i] = 1.0 / math.Sqrt(mii)
+        }
     }
     
     A := NewMatrix(n, n)
@@ -116,7 +121,7 @@ func SolveEigenvalue(K, M *Matrix, numModes int) ([]EigenPair, error) {
         }
     }
     
-    eigenvalues, eigenvectors := powerIteration(A, numModes)
+    eigenvalues, eigenvectors := jacobiMethod(A, numModes)
     
     var pairs []EigenPair
     for i := 0; i < len(eigenvalues); i++ {
@@ -134,43 +139,102 @@ func SolveEigenvalue(K, M *Matrix, numModes int) ([]EigenPair, error) {
     return pairs, nil
 }
 
-func powerIteration(A *Matrix, numModes int) ([]float64, [][]float64) {
+func jacobiMethod(A *Matrix, numModes int) ([]float64, [][]float64) {
     n := A.Rows()
+    maxIter := 10000
+    
+    D := make([]float64, n)
+    V := make([][]float64, n)
+    for i := range V {
+        V[i] = make([]float64, n)
+        V[i][i] = 1
+    }
+    
+    for i := 0; i < n; i++ {
+        D[i] = A.At(i, i)
+    }
+    
+    for iter := 0; iter < maxIter; iter++ {
+        maxOff := 0.0
+        p, q := 0, 1
+        for i := 0; i < n; i++ {
+            for j := i + 1; j < n; j++ {
+                if math.Abs(A.At(i, j)) > maxOff {
+                    maxOff = math.Abs(A.At(i, j))
+                    p, q = i, j
+                }
+            }
+        }
+        
+        if maxOff < 1e-12 {
+            break
+        }
+        
+        apq := A.At(p, q)
+        app := A.At(p, p)
+        aqq := A.At(q, q)
+        
+        theta := 0.5 * math.Atan2(2*apq, aqq-app)
+        c := math.Cos(theta)
+        s := math.Sin(theta)
+        
+        for i := 0; i < n; i++ {
+            if i != p && i != q {
+                api := A.At(p, i)
+                aqi := A.At(q, i)
+                A.Set(p, i, c*api-s*aqi)
+                A.Set(i, p, A.At(p, i))
+                A.Set(q, i, s*api+c*aqi)
+                A.Set(i, q, A.At(q, i))
+            }
+        }
+        
+        app_new := c*c*app - 2*s*c*apq + s*s*aqq
+        aqq_new := s*s*app + 2*s*c*apq + c*c*aqq
+        A.Set(p, p, app_new)
+        A.Set(q, q, aqq_new)
+        A.Set(p, q, 0)
+        A.Set(q, p, 0)
+        
+        for i := 0; i < n; i++ {
+            vpi := V[p][i]
+            vqi := V[q][i]
+            V[p][i] = c*vpi - s*vqi
+            V[q][i] = s*vpi + c*vqi
+        }
+        
+        D[p] = app_new
+        D[q] = aqq_new
+    }
+    
+    indices := make([]int, n)
+    for i := range indices {
+        indices[i] = i
+    }
+    
+    sort.Slice(indices, func(i, j int) bool {
+        return D[indices[i]] < D[indices[j]]
+    })
+    
+    numModes = min(numModes, n)
     eigenvalues := make([]float64, numModes)
     eigenvectors := make([][]float64, numModes)
     
-    for m := 0; m < numModes; m++ {
-        v := make([]float64, n)
-        for i := range v {
-            v[i] = 1.0 / math.Sqrt(float64(n))
+    for i := 0; i < numModes; i++ {
+        eigenvalues[i] = D[indices[i]]
+        eigenvectors[i] = make([]float64, n)
+        for j := 0; j < n; j++ {
+            eigenvectors[i][j] = V[indices[i]][j]
         }
         
-        for i := 0; i < 1000; i++ {
-            vNew := A.VectorMultiply(v)
-            
-            norm := 0.0
-            for _, val := range vNew {
-                norm += val * val
-            }
-            norm = math.Sqrt(norm)
-            
-            for j := range v {
-                v[j] = vNew[j] / norm
-            }
+        norm := 0.0
+        for j := 0; j < n; j++ {
+            norm += eigenvectors[i][j] * eigenvectors[i][j]
         }
-        
-        lambda := 0.0
-        Av := A.VectorMultiply(v)
-        for i := 0; i < n; i++ {
-            lambda += v[i] * Av[i]
-        }
-        
-        eigenvalues[m] = lambda
-        eigenvectors[m] = v
-        
-        for i := 0; i < n; i++ {
+        norm = math.Sqrt(norm)
+        if norm > 1e-15 {
             for j := 0; j < n; j++ {
-                A.Set(i, j, A.At(i, j)-lambda*v[i]*v[j])
+                eigenvectors[i][j] /= norm
             }
         }
     }
@@ -186,6 +250,10 @@ func NormalizeByMass(modeShape []float64, M *Matrix) []float64 {
         for j := 0; j < n; j++ {
             norm += modeShape[i] * M.At(i, j) * modeShape[j]
         }
+    }
+    
+    if norm < 1e-15 {
+        return modeShape
     }
     
     norm = math.Sqrt(norm)
@@ -206,6 +274,10 @@ func CalculateMassParticipation(modeShape []float64, M *Matrix) []float64 {
                 totalMass += M.At(j, k)
             }
         }
+    }
+    
+    if totalMass < 1e-15 {
+        return []float64{0, 0, 0}
     }
     
     participation := make([]float64, 3)
@@ -286,20 +358,26 @@ func CalculateFRF(K, M *Matrix, eigenvalues []float64, eigenvectors [][]float64,
     
     for i, freq := range frequencies {
         omega := 2 * math.Pi * freq
-        sum := complex(0, 0)
+        var sumReal, sumImag float64
         
         for j := 0; j < n; j++ {
             omega_j := math.Sqrt(eigenvalues[j])
             zeta_j := dampingRatios[j]
             
             phi_j := eigenvectors[j][dof]
-            numerator := phi_j * phi_j * amplitude
-            denominator := eigenvalues[j] - omega*omega + complex(0, 1)*2*zeta_j*omega_j*omega
+            num := phi_j * phi_j * amplitude
             
-            sum += complex(numerator, 0) / denominator
+            denomReal := eigenvalues[j] - omega*omega
+            denomImag := 2 * zeta_j * omega_j * omega
+            denomMag2 := denomReal*denomReal + denomImag*denomImag
+            
+            if denomMag2 > 1e-30 {
+                sumReal += num * denomReal / denomMag2
+                sumImag += num * denomImag / denomMag2
+            }
         }
         
-        amplitudes[i] = math.Abs(complex128(sum))
+        amplitudes[i] = math.Sqrt(sumReal*sumReal + sumImag*sumImag)
         
         if i > 0 && i < numPoints-1 {
             if amplitudes[i] > amplitudes[i-1] && amplitudes[i] > amplitudes[i+1] {
@@ -309,4 +387,11 @@ func CalculateFRF(K, M *Matrix, eigenvalues []float64, eigenvectors [][]float64,
     }
     
     return frequencies, amplitudes, resonances
+}
+
+func min(a, b int) int {
+    if a < b {
+        return a
+    }
+    return b
 }

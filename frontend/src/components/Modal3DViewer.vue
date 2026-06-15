@@ -13,7 +13,7 @@
                 <span>{{ animationSpeed.toFixed(1) }}x</span>
             </div>
             <div class="control-group">
-                <el-button @click="toggleAnimation" :icon="isAnimating ? Pause : Play">
+                <el-button @click="toggleAnimation" :icon="isAnimating ? VideoPause : VideoPlay">
                     {{ isAnimating ? '暂停' : '播放' }}
                 </el-button>
             </div>
@@ -30,7 +30,7 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { Play, Pause } from '@element-plus/icons-vue'
+import { VideoPlay, VideoPause } from '@element-plus/icons-vue'
 import type { Node, Element, ModalResult, ModeSelection } from '../types'
 
 const props = defineProps<{

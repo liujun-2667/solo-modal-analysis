@@ -94,21 +94,79 @@ const handleModelUpdate = (data: { nodes: Node[], elements: Element[], sections:
     constraints.value = data.constraints
 }
 
-const runAnalysis = async () => {
+const validateModel = (): string | null => {
     if (nodes.value.length === 0) {
-        showMessage('请先定义节点', 'warning')
-        return
+        return '请先定义节点'
     }
+    
+    const nodeIDs = new Set<number>()
+    for (const node of nodes.value) {
+        if (nodeIDs.has(node.id)) {
+            return `节点编号重复: ${node.id}`
+        }
+        nodeIDs.add(node.id)
+    }
+
     if (elements.value.length === 0) {
-        showMessage('请先定义单元', 'warning')
-        return
+        return '请先定义单元'
     }
+
+    for (const elem of elements.value) {
+        if (!nodeIDs.has(elem.node1)) {
+            return `单元 ${elem.id} 引用了不存在的节点: ${elem.node1}`
+        }
+        if (!nodeIDs.has(elem.node2)) {
+            return `单元 ${elem.id} 引用了不存在的节点: ${elem.node2}`
+        }
+    }
+
     if (sections.value.length === 0) {
-        showMessage('请先定义截面属性', 'warning')
-        return
+        return '请先定义截面属性'
     }
+
+    const sectionIDs = new Set<number>()
+    for (const sec of sections.value) {
+        if (sec.a <= 0) {
+            return `截面 ${sec.id} 的面积A必须大于0`
+        }
+        if (sec.ix <= 0) {
+            return `截面 ${sec.id} 的惯性矩Ix必须大于0`
+        }
+        if (sec.iy <= 0) {
+            return `截面 ${sec.id} 的惯性矩Iy必须大于0`
+        }
+        if (sec.iz <= 0) {
+            return `截面 ${sec.id} 的惯性矩Iz必须大于0`
+        }
+        if (sec.e <= 0) {
+            return `截面 ${sec.id} 的弹性模量E必须大于0`
+        }
+        if (sec.rho <= 0) {
+            return `截面 ${sec.id} 的密度rho必须大于0`
+        }
+        if (sec.nu < 0 || sec.nu > 0.5) {
+            return `截面 ${sec.id} 的泊松比nu必须在0到0.5之间`
+        }
+        sectionIDs.add(sec.id)
+    }
+
+    for (const elem of elements.value) {
+        if (!sectionIDs.has(elem.sectionId)) {
+            return `单元 ${elem.id} 引用了不存在的截面属性: ${elem.sectionId}`
+        }
+    }
+
     if (constraints.value.length === 0) {
-        showMessage('请先定义约束条件', 'warning')
+        return '请先定义约束条件'
+    }
+
+    return null
+}
+
+const runAnalysis = async () => {
+    const validationError = validateModel()
+    if (validationError) {
+        showMessage(validationError, 'error')
         return
     }
 
