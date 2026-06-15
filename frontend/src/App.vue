@@ -1,8 +1,11 @@
 <template>
     <div class="app-container">
         <header class="header">
-            <h1>结构动力学模态分析与振型可视化工具</h1>
-            <el-button @click="showPresetSelector = true" type="primary">加载预设算例</el-button>
+            <h1>结构动力学模态分析与优化工具</h1>
+            <div class="header-right">
+                <el-button @click="showPresetSelector = true" type="primary">加载预设算例</el-button>
+                <el-switch v-model="showOptimizationModule" active-text="优化模块" inactive-text="优化模块" />
+            </div>
         </header>
 
         <div class="main-content">
@@ -44,28 +47,38 @@
             </div>
 
             <div class="right-panel">
-                <el-card title="3D可视化" class="viewer-card">
-                    <Modal3DViewer
-                        :nodes="nodes"
-                        :elements="elements"
-                        :modalResults="modalResults"
-                        :selectedMode="selectedMode"
-                        :modeSelections="modeSelections"
-                        :transientDisplacements="transientDisplacements"
-                    />
-                </el-card>
-                <el-card title="模态选择">
-                    <ModeSelector :modalResults="modalResults" @update="handleModeSelectionsUpdate" />
-                </el-card>
-                <el-card title="瞬态响应分析">
-                    <TransientAnalysis
+                <el-card v-if="showOptimizationModule" title="结构优化与灵敏度分析" class="optimization-card">
+                    <OptimizationModule
                         :nodes="nodes"
                         :elements="elements"
                         :sections="sections"
                         :constraints="constraints"
-                        @animationUpdate="handleTransientAnimationUpdate"
                     />
                 </el-card>
+                <template v-else>
+                    <el-card title="3D可视化" class="viewer-card">
+                        <Modal3DViewer
+                            :nodes="nodes"
+                            :elements="elements"
+                            :modalResults="modalResults"
+                            :selectedMode="selectedMode"
+                            :modeSelections="modeSelections"
+                            :transientDisplacements="transientDisplacements"
+                        />
+                    </el-card>
+                    <el-card title="模态选择">
+                        <ModeSelector :modalResults="modalResults" @update="handleModeSelectionsUpdate" />
+                    </el-card>
+                    <el-card title="瞬态响应分析">
+                        <TransientAnalysis
+                            :nodes="nodes"
+                            :elements="elements"
+                            :sections="sections"
+                            :constraints="constraints"
+                            @animationUpdate="handleTransientAnimationUpdate"
+                        />
+                    </el-card>
+                </template>
             </div>
         </div>
 
@@ -88,6 +101,7 @@ import ModeSelector from './components/ModeSelector.vue'
 import PresetSelector from './components/PresetSelector.vue'
 import MACMatrix from './components/MACMatrix.vue'
 import TransientAnalysis from './components/TransientAnalysis.vue'
+import OptimizationModule from './components/OptimizationModule.vue'
 import { api } from './utils/api'
 import type { Node, Element, Section, Constraint, ModalResult, TheoryValue, ModeSelection, Preset } from './types'
 
@@ -100,6 +114,7 @@ const theoryValues = ref<TheoryValue[]>([])
 const selectedMode = ref(0)
 const modeSelections = ref<ModeSelection[]>([])
 const showPresetSelector = ref(false)
+const showOptimizationModule = ref(false)
 const message = ref('')
 const messageType = ref<'success' | 'warning' | 'error' | 'info'>('success')
 const transientDisplacements = ref<number[]>([])
@@ -287,6 +302,12 @@ html, body, #app {
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
 .header h1 {
     font-size: 20px;
     font-weight: 600;
@@ -335,6 +356,10 @@ html, body, #app {
 
 .viewer-card {
     flex: 2;
+}
+
+.optimization-card {
+    flex: 3;
 }
 
 .empty-state {

@@ -99,9 +99,102 @@ type TransientRequest struct {
 }
 
 type TransientResponse struct {
-    Success        bool        `json:"success"`
-    Message        string      `json:"message"`
-    TimePoints     []float64   `json:"timePoints"`
-    Displacements  []float64   `json:"displacements"`
-    AllDisplacements [][]float64 `json:"allDisplacements"`
+    Success           bool          `json:"success"`
+    Message           string        `json:"message"`
+    TimePoints        []float64     `json:"timePoints"`
+    Displacements     []float64     `json:"displacements"`
+    AllDisplacements  [][]float64   `json:"allDisplacements"`
+}
+
+type DesignVariable struct {
+    SectionID    int     `json:"sectionId"`
+    Property     string  `json:"property"`
+    Enabled      bool    `json:"enabled"`
+    LowerBound   float64 `json:"lowerBound"`
+    UpperBound   float64 `json:"upperBound"`
+    InitialValue float64 `json:"initialValue"`
+}
+
+type SensitivityResult struct {
+    ModeIndex    int               `json:"modeIndex"`
+    FrequencyHz  float64           `json:"frequencyHz"`
+    Sensitivities []SensitivityItem `json:"sensitivities"`
+}
+
+type SensitivityItem struct {
+    DesignVarId string  `json:"designVarId"`
+    Sensitivity float64 `json:"sensitivity"`
+}
+
+type SensitivityResponse struct {
+    Success       bool               `json:"success"`
+    Message       string             `json:"message"`
+    Results       []SensitivityResult `json:"results"`
+    DesignVarNames []string          `json:"designVarNames"`
+}
+
+type FrequencyConstraint struct {
+    ModeIndex   int     `json:"modeIndex"`
+    Type        string  `json:"type"`
+    LowerBound  float64 `json:"lowerBound,omitempty"`
+    UpperBound  float64 `json:"upperBound,omitempty"`
+}
+
+type OptimizationRequest struct {
+    Nodes               []Node               `json:"nodes"`
+    Elements            []Element            `json:"elements"`
+    Sections            []Section            `json:"sections"`
+    Constraints         []Constraint         `json:"constraints"`
+    DesignVariables     []DesignVariable     `json:"designVariables"`
+    FrequencyConstraints []FrequencyConstraint `json:"frequencyConstraints"`
+    NumModes            int                  `json:"numModes"`
+    MaxIterations       int                  `json:"maxIterations"`
+    Tolerance           float64              `json:"tolerance"`
+}
+
+type IterationRecord struct {
+    Iteration          int       `json:"iteration"`
+    Objective          float64   `json:"objective"`
+    DesignVariables    []float64 `json:"designVariables"`
+    Frequencies        []float64 `json:"frequencies"`
+    ConstraintViolations []float64 `json:"constraintViolations"`
+    Feasible           bool      `json:"feasible"`
+}
+
+type OptimizationResponse struct {
+    Success              bool               `json:"success"`
+    Message              string             `json:"message"`
+    InitialDesignVariables []float64        `json:"initialDesignVariables"`
+    FinalDesignVariables   []float64        `json:"finalDesignVariables"`
+    InitialFrequencies    []float64         `json:"initialFrequencies"`
+    FinalFrequencies      []float64         `json:"finalFrequencies"`
+    InitialMass          float64            `json:"initialMass"`
+    FinalMass            float64            `json:"finalMass"`
+    Iterations           []IterationRecord  `json:"iterations"`
+    Converged            bool               `json:"converged"`
+}
+
+type ParamScanRequest struct {
+    Nodes           []Node           `json:"nodes"`
+    Elements        []Element        `json:"elements"`
+    Sections        []Section        `json:"sections"`
+    Constraints     []Constraint     `json:"constraints"`
+    DesignVariable  DesignVariable   `json:"designVariable"`
+    ScanStart       float64          `json:"scanStart"`
+    ScanEnd         float64          `json:"scanEnd"`
+    NumSteps        int              `json:"numSteps"`
+    NumModes        int              `json:"numModes"`
+    SecondVariable  *DesignVariable  `json:"secondVariable,omitempty"`
+    SecondScanStart *float64         `json:"secondScanStart,omitempty"`
+    SecondScanEnd   *float64         `json:"secondScanEnd,omitempty"`
+    SecondNumSteps  *int             `json:"secondNumSteps,omitempty"`
+}
+
+type ParamScanResponse struct {
+    Success         bool        `json:"success"`
+    Message         string      `json:"message"`
+    ScanValues      []float64   `json:"scanValues"`
+    Frequencies     [][]float64 `json:"frequencies"`
+    SecondScanValues []float64  `json:"secondScanValues,omitempty"`
+    Frequencies2D   [][]float64 `json:"frequencies2D,omitempty"`
 }

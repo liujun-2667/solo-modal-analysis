@@ -28,6 +28,9 @@ func main() {
 	r.POST("/api/preset/:name", handler.LoadPreset)
 	r.POST("/api/frf", handler.CalculateFRF)
 	r.POST("/api/transient", handler.CalculateTransient)
+	r.POST("/api/sensitivity", handler.CalculateSensitivity)
+	r.POST("/api/optimization", handler.SolveOptimization)
+	r.POST("/api/paramscan", handler.PerformParamScan)
 
 	r.Run(":8080")
 }

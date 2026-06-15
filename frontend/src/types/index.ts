@@ -120,3 +120,109 @@ export interface ModeSelection {
     enabled: boolean
     scale: number
 }
+
+export interface DesignVariable {
+    sectionId: number
+    property: 'a' | 'ix' | 'iy' | 'iz' | 'e' | 'rho'
+    enabled: boolean
+    lowerBound: number
+    upperBound: number
+    initialValue: number
+}
+
+export interface SensitivityResult {
+    modeIndex: number
+    frequencyHz: number
+    sensitivities: {
+        designVarId: string
+        sensitivity: number
+    }[]
+}
+
+export interface SensitivityResponse {
+    success: boolean
+    message: string
+    results: SensitivityResult[]
+    designVarNames: string[]
+}
+
+export interface FrequencyConstraint {
+    modeIndex: number
+    type: 'lower' | 'upper' | 'both'
+    lowerBound?: number
+    upperBound?: number
+}
+
+export interface OptimizationRequest {
+    nodes: Node[]
+    elements: Element[]
+    sections: Section[]
+    constraints: Constraint[]
+    designVariables: DesignVariable[]
+    frequencyConstraints: FrequencyConstraint[]
+    numModes: number
+    maxIterations: number
+    tolerance: number
+}
+
+export interface IterationRecord {
+    iteration: number
+    objective: number
+    designVariables: number[]
+    frequencies: number[]
+    constraintViolations: number[]
+    feasible: boolean
+}
+
+export interface OptimizationResponse {
+    success: boolean
+    message: string
+    initialDesignVariables: number[]
+    finalDesignVariables: number[]
+    initialFrequencies: number[]
+    finalFrequencies: number[]
+    initialMass: number
+    finalMass: number
+    iterations: IterationRecord[]
+    converged: boolean
+}
+
+export interface ParamScanRequest {
+    nodes: Node[]
+    elements: Element[]
+    sections: Section[]
+    constraints: Constraint[]
+    designVariable: DesignVariable
+    scanStart: number
+    scanEnd: number
+    numSteps: number
+    numModes: number
+    secondVariable?: DesignVariable
+    secondScanStart?: number
+    secondScanEnd?: number
+    secondNumSteps?: number
+}
+
+export interface ParamScanResponse {
+    success: boolean
+    message: string
+    scanValues: number[]
+    frequencies: number[][]
+    secondScanValues?: number[]
+    frequencies2D?: number[][]
+}
+
+export interface OptimizationHistoryRecord {
+    id: string
+    timestamp: string
+    name: string
+    initialDesignVariables: number[]
+    finalDesignVariables: number[]
+    initialFrequencies: number[]
+    finalFrequencies: number[]
+    initialMass: number
+    finalMass: number
+    iterations: IterationRecord[]
+    converged: boolean
+    designVarNames: string[]
+}
