@@ -239,7 +239,7 @@ interface ConstraintCheck {
     satisfied: boolean
 }
 
-<const optimizationParams = reactive({
+const optimizationParams = reactive({
     maxIterations: 30,
     tolerance: 1e-6,
     constraintTolerance: 1e-4,
