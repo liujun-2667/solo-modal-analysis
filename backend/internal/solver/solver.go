@@ -1,9 +1,11 @@
 package solver
 
 import (
+    "errors"
     "math"
     "sort"
     "modal-analysis/internal/model"
+    "strconv"
 )
 
 type EigenPair struct {
@@ -295,36 +297,69 @@ func CalculateMassParticipation(modeShape []float64, M *Matrix) []float64 {
 }
 
 func ValidateModel(request model.AnalysisRequest) error {
+    if len(request.Nodes) == 0 {
+        return errors.New("至少需要一个节点")
+    }
+    
     nodeIDs := make(map[int]bool)
     for _, node := range request.Nodes {
         if nodeIDs[node.ID] {
-            return nil
+            return errors.New("节点编号重复: " + strconv.Itoa(node.ID))
         }
         nodeIDs[node.ID] = true
     }
     
+    if len(request.Elements) == 0 {
+        return errors.New("至少需要一个单元")
+    }
+    
     for _, elem := range request.Elements {
-        if !nodeIDs[elem.Node1] || !nodeIDs[elem.Node2] {
-            return nil
+        if !nodeIDs[elem.Node1] {
+            return errors.New("单元引用了不存在的节点: " + strconv.Itoa(elem.Node1))
         }
+        if !nodeIDs[elem.Node2] {
+            return errors.New("单元引用了不存在的节点: " + strconv.Itoa(elem.Node2))
+        }
+    }
+    
+    if len(request.Sections) == 0 {
+        return errors.New("至少需要一个截面属性")
     }
     
     sectionIDs := make(map[int]bool)
     for _, sec := range request.Sections {
-        if sec.A <= 0 || sec.Ix <= 0 || sec.Iy <= 0 || sec.Iz <= 0 || sec.E <= 0 || sec.Rho <= 0 {
-            return nil
+        if sec.A <= 0 {
+            return errors.New("截面属性的面积A必须大于0")
+        }
+        if sec.Ix <= 0 {
+            return errors.New("截面属性的惯性矩Ix必须大于0")
+        }
+        if sec.Iy <= 0 {
+            return errors.New("截面属性的惯性矩Iy必须大于0")
+        }
+        if sec.Iz <= 0 {
+            return errors.New("截面属性的惯性矩Iz必须大于0")
+        }
+        if sec.E <= 0 {
+            return errors.New("截面属性的弹性模量E必须大于0")
+        }
+        if sec.Rho <= 0 {
+            return errors.New("截面属性的密度rho必须大于0")
+        }
+        if sec.Nu < 0 || sec.Nu > 0.5 {
+            return errors.New("截面属性的泊松比nu必须在0到0.5之间")
         }
         sectionIDs[sec.ID] = true
     }
     
     for _, elem := range request.Elements {
         if !sectionIDs[elem.SectionID] {
-            return nil
+            return errors.New("单元引用了不存在的截面属性: " + strconv.Itoa(elem.SectionID))
         }
     }
     
     if len(request.Constraints) == 0 {
-        return nil
+        return errors.New("至少需要一个约束条件")
     }
     
     return nil

@@ -138,7 +138,7 @@ const createStructure = () => {
     deformedGeometry.setFromPoints(deformedPoints)
 
     const originalMaterial = new THREE.LineBasicMaterial({ color: 0xaaaaaa, linewidth: 1 })
-    const deformedMaterial = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 3 })
+    const deformedMaterial = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 3 })
 
     originalLine = new THREE.LineSegments(originalGeometry, originalMaterial)
     deformedLine = new THREE.LineSegments(deformedGeometry, deformedMaterial)

@@ -200,10 +200,10 @@ func ComputeLocalMassMatrix(section model.Section, length float64) *Matrix {
     mass := rho * A * length
     L := length
     
-    m.Set(0, 0, mass/2)
-    m.Set(0, 6, mass/2)
-    m.Set(6, 0, mass/2)
-    m.Set(6, 6, mass/2)
+    m.Set(0, 0, mass/3)
+    m.Set(0, 6, mass/6)
+    m.Set(6, 0, mass/6)
+    m.Set(6, 6, mass/3)
     
     m.Set(1, 1, 13*mass/35)
     m.Set(1, 2, 11*mass*L/210)
