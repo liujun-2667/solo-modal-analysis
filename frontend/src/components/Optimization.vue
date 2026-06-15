@@ -8,8 +8,14 @@
                 <el-form-item label="最大迭代">
                     <el-input-number v-model="optimizationParams.maxIterations" :min="1" :max="100" />
                 </el-form-item>
-                <el-form-item label="容差">
+                <el-form-item label="目标函数容差">
                     <el-input-number v-model="optimizationParams.tolerance" :step="1e-8" />
+                </el-form-item>
+                <el-form-item label="约束违反容差">
+                    <el-input-number v-model="optimizationParams.constraintTolerance" :step="1e-6" />
+                </el-form-item>
+                <el-form-item label="设计变量容差">
+                    <el-input-number v-model="optimizationParams.designVarTolerance" :step="1e-4" />
                 </el-form-item>
                 <el-form-item label="模态阶数">
                     <el-input-number v-model="optimizationParams.numModes" :min="1" :max="50" />
@@ -112,6 +118,78 @@
                     </div>
                 </el-card>
             </div>
+
+            <div v-if="verificationResult" class="verification-section">
+                <el-card title="优化结果验证报告" class="verification-card">
+                    <div class="verification-summary">
+                        <div class="verification-item">
+                            <span class="label">质量减少百分比:</span>
+                            <span class="value" :class="{ 'highlight': verificationResult.massReductionPercent > 0 }">
+                                {{ verificationResult.massReductionPercent.toFixed(2) }}%
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="verification-table-section">
+                        <h4>频率验证 (重新分析 vs 优化记录)</h4>
+                        <el-table :data="frequencyVerificationData" border size="small">
+                            <el-table-column label="模态阶数" prop="mode" />
+                            <el-table-column label="优化记录值(Hz)" prop="optimized" />
+                            <el-table-column label="重新分析值(Hz)" prop="reanalyzed" />
+                            <el-table-column label="偏差(%)" prop="deviation">
+                                <template #default="scope">
+                                    <span :class="{ 'warning': scope.row.deviation >= 0.1 }">
+                                        {{ scope.row.deviation.toFixed(4) }}%
+                                    </span>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+
+                    <div class="verification-table-section">
+                        <h4>约束满足检查</h4>
+                        <el-table :data="verificationResult.constraintChecks" border size="small">
+                            <el-table-column label="模态阶数" prop="modeIndex" />
+                            <el-table-column label="约束类型">
+                                <template #default="scope">
+                                    {{ scope.row.type === 'lower' ? '下限' : scope.row.type === 'upper' ? '上限' : '双向' }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="下限值(Hz)" prop="lowerBound">
+                                <template #default="scope">
+                                    {{ scope.row.lowerBound?.toFixed(4) || '-' }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="实际值(Hz)" prop="actualValue">
+                                <template #default="scope">
+                                    {{ scope.row.actualValue.toFixed(4) }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="上限值(Hz)" prop="upperBound">
+                                <template #default="scope">
+                                    {{ scope.row.upperBound?.toFixed(4) || '-' }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="满足">
+                                <template #default="scope">
+                                    <span :class="{ 'success': scope.row.satisfied, 'error': !scope.row.satisfied }">
+                                        {{ scope.row.satisfied ? '✓' : '✗' }}
+                                    </span>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+                </el-card>
+            </div>
+
+            <div v-if="verifying" class="verifying-state">
+                <el-card>
+                    <div class="verifying-text">
+                        <i class="el-icon-loading"></i>
+                        <span>正在进行验证分析...</span>
+                    </div>
+                </el-card>
+            </div>
         </div>
 
         <div v-else class="empty-state">
@@ -140,12 +218,32 @@ const emit = defineEmits<{
 
 const loading = ref(false)
 const optimizationResult = ref<OptimizationResponse | null>(null)
+const verificationResult = ref<VerificationResult | null>(null)
+const verifying = ref(false)
 const convergenceChartRef = ref<HTMLElement | null>(null)
 let chartInstance: echarts.ECharts | null = null
 
-const optimizationParams = reactive({
+interface VerificationResult {
+    reanalyzedFrequencies: number[]
+    frequencyDeviations: number[]
+    constraintChecks: ConstraintCheck[]
+    massReductionPercent: number
+}
+
+interface ConstraintCheck {
+    modeIndex: number
+    type: 'lower' | 'upper' | 'both'
+    actualValue: number
+    lowerBound?: number
+    upperBound?: number
+    satisfied: boolean
+}
+
+<const optimizationParams = reactive({
     maxIterations: 30,
     tolerance: 1e-6,
+    constraintTolerance: 1e-4,
+    designVarTolerance: 0.001,
     numModes: 10
 })
 
@@ -204,6 +302,16 @@ const massReduction = computed(() => {
     return initial !== 0 ? ((initial - final) / initial * 100) : 0
 })
 
+const frequencyVerificationData = computed(() => {
+    if (!verificationResult.value || !optimizationResult.value) return []
+    return verificationResult.value.reanalyzedFrequencies.map((freq, i) => ({
+        mode: i + 1,
+        optimized: optimizationResult.value?.finalFrequencies[i]?.toFixed(4) || '0',
+        reanalyzed: freq.toFixed(4),
+        deviation: verificationResult.value.frequencyDeviations[i]
+    }))
+})
+
 const runOptimization = async () => {
     loading.value = true
     try {
@@ -216,12 +324,15 @@ const runOptimization = async () => {
             frequencyConstraints: frequencyConstraints.value,
             numModes: optimizationParams.numModes,
             maxIterations: optimizationParams.maxIterations,
-            tolerance: optimizationParams.tolerance
+            tolerance: optimizationParams.tolerance,
+            constraintTolerance: optimizationParams.constraintTolerance,
+            designVarTolerance: optimizationParams.designVarTolerance
         })
 
         if (response.success) {
             optimizationResult.value = response
             emit('optimizationComplete', response)
+            await runVerification(response)
         } else {
             console.error(response.message)
         }
@@ -229,6 +340,66 @@ const runOptimization = async () => {
         console.error('优化失败:', error)
     } finally {
         loading.value = false
+    }
+}
+
+const runVerification = async (optimizationResult: OptimizationResponse) => {
+    verifying.value = true
+    try {
+        const finalSections = [...props.sections]
+        const enabledDVs = props.designVariables.filter(dv => dv.enabled)
+        enabledDVs.forEach((dv, index) => {
+            const sectionIndex = finalSections.findIndex(s => s.id === dv.sectionId)
+            if (sectionIndex !== -1) {
+                finalSections[sectionIndex][dv.property] = optimizationResult.finalDesignVariables[index]
+            }
+        })
+
+        const response = await api.analyze({
+            nodes: props.nodes,
+            elements: props.elements,
+            sections: finalSections,
+            constraints: props.constraints,
+            numModes: optimizationParams.numModes
+        })
+
+        if (response.success) {
+            const reanalyzedFrequencies = response.modalResults.map(mr => mr.frequencyHz)
+            const frequencyDeviations = reanalyzedFrequencies.map((freq, i) => {
+                const optFreq = optimizationResult.finalFrequencies[i]
+                return optFreq !== 0 ? Math.abs((freq - optFreq) / optFreq * 100) : 0
+            })
+
+            const constraintChecks: ConstraintCheck[] = frequencyConstraints.value.map(fc => {
+                const actualValue = reanalyzedFrequencies[fc.modeIndex - 1] || 0
+                let satisfied = true
+                if (fc.type === 'lower' || fc.type === 'both') {
+                    satisfied = satisfied && actualValue >= (fc.lowerBound || 0)
+                }
+                if (fc.type === 'upper' || fc.type === 'both') {
+                    satisfied = satisfied && actualValue <= (fc.upperBound || Infinity)
+                }
+                return {
+                    modeIndex: fc.modeIndex,
+                    type: fc.type,
+                    actualValue,
+                    lowerBound: fc.lowerBound,
+                    upperBound: fc.upperBound,
+                    satisfied
+                }
+            })
+
+            verificationResult.value = {
+                reanalyzedFrequencies,
+                frequencyDeviations,
+                constraintChecks,
+                massReductionPercent: massReduction.value
+            }
+        }
+    } catch (error) {
+        console.error('验证分析失败:', error)
+    } finally {
+        verifying.value = false
     }
 }
 
@@ -398,6 +569,81 @@ watch(optimizationResult, () => {
 
 .summary-item .value.error {
     color: #f56c6c;
+}
+
+.verification-section {
+    padding-top: 10px;
+}
+
+.verification-card {
+    margin-top: 10px;
+}
+
+.verification-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e8e8e8;
+    margin-bottom: 15px;
+}
+
+.verification-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.verification-item .label {
+    font-weight: 500;
+    color: #606266;
+}
+
+.verification-item .value {
+    font-weight: 600;
+    color: #303133;
+}
+
+.verification-table-section {
+    margin-bottom: 15px;
+}
+
+.verification-table-section h4 {
+    margin-bottom: 10px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.verification-table-section :deep(.el-table) {
+    font-size: 12px;
+}
+
+.verification-table-section .warning {
+    color: #e6a23c;
+    font-weight: 600;
+}
+
+.verification-table-section .success {
+    color: #67c23a;
+    font-weight: 600;
+}
+
+.verification-table-section .error {
+    color: #f56c6c;
+    font-weight: 600;
+}
+
+.verifying-state {
+    padding-top: 10px;
+}
+
+.verifying-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 20px;
+    color: #606266;
 }
 
 .empty-state {

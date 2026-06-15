@@ -163,6 +163,8 @@ export interface OptimizationRequest {
     numModes: number
     maxIterations: number
     tolerance: number
+    constraintTolerance?: number
+    designVarTolerance?: number
 }
 
 export interface IterationRecord {

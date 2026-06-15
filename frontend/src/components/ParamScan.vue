@@ -63,6 +63,9 @@
         </div>
 
         <div v-if="scanResult" class="results">
+            <div class="export-section">
+                <el-button @click="exportToCSV" type="primary">导出CSV</el-button>
+            </div>
             <div v-if="scanType === '1D'" class="chart-section">
                 <h4>参数-频率曲线</h4>
                 <div ref="chartRef" class="chart"></div>
@@ -122,6 +125,54 @@ const getDesignVarFromString = (id: string): DesignVariable | undefined => {
     return props.designVariables.find(
         dv => dv.sectionId === parseInt(sectionId) && dv.property === property
     )
+}
+
+const exportToCSV = () => {
+    if (!scanResult.value) return
+
+    let csvContent = ''
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+
+    if (scanType.value === '1D') {
+        const headers = ['参数值', ...Array.from({ length: scanParams.numModes }, (_, i) => `第${i + 1}阶频率(Hz)`)]
+        csvContent = headers.join(',') + '\n'
+
+        scanResult.value.scanValues.forEach((value, index) => {
+            const frequencies = scanResult.value!.frequencies[index] || []
+            const row = [value.toExponential(6), ...frequencies.map(f => f.toFixed(6))]
+            csvContent += row.join(',') + '\n'
+        })
+
+        downloadCSV(csvContent, `参数扫描_一维_${timestamp}.csv`)
+    } else {
+        if (!scanResult.value.secondScanValues || !scanResult.value.frequencies2D) return
+
+        const yValues = scanResult.value.secondScanValues
+        const xValues = scanResult.value.scanValues
+
+        csvContent = ',,' + yValues.map(v => v.toExponential(6)).join(',') + '\n'
+
+        xValues.forEach((x, i) => {
+            const row = [`第${scanParams.targetMode}阶频率`, x.toExponential(6)]
+            const frequencies = scanResult.value!.frequencies2D![i] || []
+            row.push(...frequencies.map(f => f.toFixed(6)))
+            csvContent += row.join(',') + '\n'
+        })
+
+        downloadCSV(csvContent, `参数扫描_二维_${timestamp}.csv`)
+    }
+}
+
+const downloadCSV = (content: string, filename: string) => {
+    const blob = new Blob([`\uFEFF${content}`], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', filename)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
 }
 
 const runParamScan = async () => {
@@ -367,6 +418,10 @@ watch([scanResult, scanType], () => {
     flex: 1;
     overflow: auto;
     padding-top: 15px;
+}
+
+.export-section {
+    padding-bottom: 15px;
 }
 
 .chart-section {

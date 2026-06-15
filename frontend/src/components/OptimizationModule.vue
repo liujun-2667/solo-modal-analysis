@@ -14,6 +14,7 @@
                     :sections="sections"
                     :constraints="constraints"
                     :designVariables="designVariables"
+                    @recommendVariables="handleRecommendVariables"
                 />
             </el-tab-pane>
             <el-tab-pane label="频率约束优化" name="optimization">
@@ -70,6 +71,10 @@ const enabledDesignVarNames = computed(() => {
 })
 
 const handleDesignVariablesUpdate = (variables: DesignVariable[]) => {
+    designVariables.value = variables
+}
+
+const handleRecommendVariables = (variables: DesignVariable[]) => {
     designVariables.value = variables
 }
 

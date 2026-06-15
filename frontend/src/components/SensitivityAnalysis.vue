@@ -12,6 +12,16 @@
         </div>
 
         <div v-if="sensitivityResults.length > 0" class="results">
+            <div class="recommendation-section">
+                <el-form :model="recommendationParams" inline>
+                    <el-form-item label="自动推荐前N个变量">
+                        <el-input-number v-model="recommendationParams.topN" :min="1" :max="10" />
+                    </el-form-item>
+                    <el-button @click="recommendDesignVariables" type="primary">
+                        自动推荐设计变量
+                    </el-button>
+                </el-form>
+            </div>
             <div class="table-section">
                 <h4>灵敏度矩阵</h4>
                 <el-table :data="sensitivityResults" border>
@@ -72,6 +82,10 @@ const props = defineProps<{
     designVariables: DesignVariable[]
 }>()
 
+const emit = defineEmits<{
+    (e: 'recommendVariables', variables: DesignVariable[]): void
+}>()
+
 const loading = ref(false)
 const sensitivityResults = ref<SensitivityResult[]>([])
 const designVarNames = ref<string[]>([])
@@ -84,6 +98,10 @@ const analysisParams = reactive({
 
 const chartParams = reactive({
     selectedMode: 1
+})
+
+const recommendationParams = reactive({
+    topN: 3
 })
 
 const getSensitivity = (sensitivities: SensitivityItem[], name: string): string => {
@@ -122,6 +140,47 @@ const runSensitivity = async () => {
         console.error('灵敏度分析失败:', error)
     } finally {
         loading.value = false
+    }
+}
+
+const recommendDesignVariables = () => {
+    if (sensitivityResults.value.length === 0) {
+        return
+    }
+
+    const sensitivitySums: Record<string, number> = {}
+    designVarNames.value.forEach(name => {
+        sensitivitySums[name] = 0
+    })
+
+    sensitivityResults.value.forEach(result => {
+        result.sensitivities.forEach(s => {
+            sensitivitySums[s.designVarId] += Math.abs(s.sensitivity)
+        })
+    })
+
+    const sortedNames = Object.entries(sensitivitySums)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, recommendationParams.topN)
+        .map(([name]) => name)
+
+    const recommendedVariables: DesignVariable[] = [...props.designVariables]
+    recommendedVariables.forEach(dv => {
+        const varName = `截面${dv.sectionId}.${dv.property}`
+        if (sortedNames.includes(varName)) {
+            dv.enabled = true
+            dv.lowerBound = dv.initialValue * 0.5
+            dv.upperBound = dv.initialValue * 2.0
+        } else {
+            dv.enabled = false
+        }
+    })
+
+    emit('recommendVariables', recommendedVariables)
+
+    const tabElement = document.querySelector('.el-tabs__item[name="designVariables"]') as HTMLElement
+    if (tabElement) {
+        tabElement.click()
     }
 }
 
@@ -221,6 +280,14 @@ watch(sensitivityResults, () => {
     gap: 15px;
     overflow: auto;
     padding-top: 15px;
+}
+
+.recommendation-section {
+    padding: 10px 15px;
+    background: #f5f7fa;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
 }
 
 .table-section {
