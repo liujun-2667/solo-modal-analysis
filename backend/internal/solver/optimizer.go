@@ -207,9 +207,8 @@ func SolveOptimization(request model.OptimizationRequest) (*model.OptimizationRe
 		}
 		
 		grad := computeGradient(x, request, enabledDVs)
-		constraintViolations = evaluateConstraints(freqs, request.FrequencyConstraints)
 		
-		x = updateDesignVariables(x, grad, constraintViolations, lb, ub, request.FrequencyConstraints, freqs)
+		x = updateDesignVariables(x, grad, lb, ub)
 		
 		for i := range x {
 			if x[i] < lb[i] {
@@ -306,33 +305,6 @@ func computeGradient(x []float64, request model.OptimizationRequest, dvs []model
 	return grad
 }
 
-func computeConstraintGradients(x []float64, request model.OptimizationRequest, dvs []model.DesignVariable) [][]float64 {
-	h := 1e-6
-	numConstraints := len(request.FrequencyConstraints)
-	grads := make([][]float64, numConstraints)
-	
-	for i, fc := range request.FrequencyConstraints {
-		grads[i] = make([]float64, len(dvs))
-		
-		for j := range dvs {
-			xPlus := append([]float64(nil), x...)
-			xPlus[j] += h
-			tempSections := updateSections(request.Sections, dvs, xPlus)
-			freqsPlus, _ := computeFrequencies(request.Nodes, request.Elements, tempSections, request.Constraints, request.NumModes)
-			
-			xMinus := append([]float64(nil), x...)
-			xMinus[j] -= h
-			tempSections = updateSections(request.Sections, dvs, xMinus)
-			freqsMinus, _ := computeFrequencies(request.Nodes, request.Elements, tempSections, request.Constraints, request.NumModes)
-			
-			if fc.ModeIndex-1 < len(freqsPlus) && fc.ModeIndex-1 < len(freqsMinus) {
-				grads[i][j] = (freqsPlus[fc.ModeIndex-1] - freqsMinus[fc.ModeIndex-1]) / (2 * h)
-			}
-		}
-	}
-	return grads
-}
-
 func evaluateConstraints(freqs []float64, constraints []model.FrequencyConstraint) []float64 {
 	violations := make([]float64, len(constraints))
 	
@@ -362,8 +334,7 @@ func evaluateConstraints(freqs []float64, constraints []model.FrequencyConstrain
 	return violations
 }
 
-func updateDesignVariables(x, grad, constraintViolations []float64, lb, ub []float64, 
-	constraints []model.FrequencyConstraint, freqs []float64) []float64 {
+func updateDesignVariables(x, grad, lb, ub []float64) []float64 {
 	newX := append([]float64(nil), x...)
 	
 	stepSize := 0.01
@@ -373,45 +344,7 @@ func updateDesignVariables(x, grad, constraintViolations []float64, lb, ub []flo
 		newX[i] -= stepSize * descent
 	}
 	
-	for _, fc := range constraints {
-		if fc.ModeIndex-1 >= len(freqs) {
-			continue
-		}
-		freq := freqs[fc.ModeIndex-1]
-		
-		switch fc.Type {
-		case "lower":
-			if freq < fc.LowerBound {
-				for j := range newX {
-					sens := estimateSensitivity(j, fc.ModeIndex-1, x, constraints, freqs)
-					if sens > 0 {
-						violation := fc.LowerBound - freq
-						newX[j] += violation / sens * 0.1
-					}
-				}
-			}
-		case "upper":
-			if freq > fc.UpperBound {
-				for j := range newX {
-					sens := estimateSensitivity(j, fc.ModeIndex-1, x, constraints, freqs)
-					if sens < 0 {
-						violation := freq - fc.UpperBound
-						newX[j] += violation / sens * 0.1
-					}
-				}
-			}
-		}
-	}
-	
 	return newX
-}
-
-func estimateSensitivity(dvIndex, modeIndex int, x []float64, constraints []model.FrequencyConstraint, freqs []float64) float64 {
-	h := 1e-6
-	xPlus := append([]float64(nil), x...)
-	xPlus[dvIndex] += h
-	
-	return 0.01
 }
 
 func PerformParamScan(request model.ParamScanRequest) (*model.ParamScanResponse, error) {
