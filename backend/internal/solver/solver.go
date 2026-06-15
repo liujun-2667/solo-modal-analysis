@@ -430,3 +430,124 @@ func min(a, b int) int {
     }
     return b
 }
+
+func GetExcitationForce(waveformType string, amplitude, duration, time float64) float64 {
+    switch waveformType {
+    case "impulse":
+        if time < duration {
+            return amplitude / duration
+        }
+        return 0
+    case "step":
+        if time >= 0 {
+            return amplitude
+        }
+        return 0
+    case "halfsine":
+        if time >= 0 && time < duration {
+            return amplitude * math.Sin(math.Pi * time / duration)
+        }
+        return 0
+    default:
+        return 0
+    }
+}
+
+func CalculateTransientResponse(
+    K, M *Matrix,
+    eigenvalues []float64,
+    eigenvectors [][]float64,
+    excitationNode, directionIndex int,
+    waveformType string,
+    amplitude, duration, timeStep, totalTime, dampingRatio float64,
+    observationNode, observationDirIndex int) ([]float64, []float64, [][]float64) {
+
+    numModes := len(eigenvalues)
+    numTimeSteps := int(totalTime / timeStep)
+    if numTimeSteps <= 0 {
+        numTimeSteps = 1000
+    }
+
+    timePoints := make([]float64, numTimeSteps)
+    for i := 0; i < numTimeSteps; i++ {
+        timePoints[i] = float64(i) * timeStep
+    }
+
+    excitationDof := excitationNode*6 + directionIndex
+    observationDof := observationNode*6 + observationDirIndex
+
+    allDisplacements := make([][]float64, numTimeSteps)
+    for i := range allDisplacements {
+        allDisplacements[i] = make([]float64, len(eigenvectors[0]))
+    }
+
+    displacements := make([]float64, numTimeSteps)
+
+    for i, t := range timePoints {
+        f := GetExcitationForce(waveformType, amplitude, duration, t)
+        
+        var totalDisp float64
+        
+        for j := 0; j < numModes; j++ {
+            omega_j := math.Sqrt(eigenvalues[j])
+            zeta_j := dampingRatio
+            
+            phi_j_exc := eigenvectors[j][excitationDof]
+            phi_j_obs := eigenvectors[j][observationDof]
+            
+            if phi_j_exc == 0 {
+                continue
+            }
+            
+            omega_d := omega_j * math.Sqrt(1-zeta_j*zeta_j)
+            
+            var disp float64
+            
+            if t >= duration {
+                tau := t - duration
+                disp = (f * phi_j_exc / (omega_d * eigenvalues[j])) * 
+                    math.Exp(-zeta_j*omega_j*t) * 
+                    math.Sin(omega_d*t) -
+                    (f * phi_j_exc / (omega_d * eigenvalues[j])) * 
+                    math.Exp(-zeta_j*omega_j*tau) * 
+                    math.Sin(omega_d*tau)
+            } else {
+                switch waveformType {
+                case "impulse":
+                    disp = (f * phi_j_exc / eigenvalues[j]) * 
+                        math.Exp(-zeta_j*omega_j*t) * 
+                        math.Sin(omega_d*t) / omega_d
+                case "step":
+                    disp = (f * phi_j_exc / eigenvalues[j]) * 
+                        (1 - math.Exp(-zeta_j*omega_j*t) * 
+                        (math.Cos(omega_d*t) + zeta_j*omega_j*math.Sin(omega_d*t)/omega_d))
+                case "halfsine":
+                    wd_2 := omega_d * omega_d
+                    wn_2 := eigenvalues[j]
+                    zeta_wn := zeta_j * omega_j
+                    
+                    A := f * phi_j_exc * duration / (math.Pi * (wn_2 - (math.Pi/duration)*(math.Pi/duration)))
+                    
+                    term1 := math.Exp(-zeta_wn*t) * 
+                        (math.Cos(omega_d*t) + zeta_wn*math.Sin(omega_d*t)/omega_d)
+                    
+                    term2 := math.Cos(math.Pi * t / duration)
+                    term3 := (2 * zeta_wn * math.Pi / duration) * math.Sin(math.Pi * t / duration) / wd_2
+                    term4 := ((wn_2 - (math.Pi/duration)*(math.Pi/duration)) / wd_2) * math.Sin(math.Pi * t / duration)
+                    
+                    disp = A * (term1 - term2 + term3 + term4)
+                }
+            }
+            
+            totalDisp += disp * phi_j_obs
+            
+            for k := range allDisplacements[i] {
+                allDisplacements[i][k] += disp * eigenvectors[j][k]
+            }
+        }
+        
+        displacements[i] = totalDisp
+    }
+
+    return timePoints, displacements, allDisplacements
+}

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { AnalysisRequest, AnalysisResponse, Preset, FRFRequest, FRFResponse } from '../types'
+import type { AnalysisRequest, AnalysisResponse, Preset, FRFRequest, FRFResponse, TransientRequest, TransientResponse } from '../types'
 
 const BASE_URL = 'http://localhost:8080/api'
 
@@ -21,6 +21,11 @@ export const api = {
 
     calculateFRF: async (request: FRFRequest): Promise<FRFResponse> => {
         const response = await axios.post(`${BASE_URL}/frf`, request)
+        return response.data
+    },
+
+    calculateTransient: async (request: TransientRequest): Promise<TransientResponse> => {
+        const response = await axios.post(`${BASE_URL}/transient`, request)
         return response.data
     }
 }

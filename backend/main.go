@@ -27,6 +27,7 @@ func main() {
 	r.GET("/api/presets", handler.GetPresets)
 	r.POST("/api/preset/:name", handler.LoadPreset)
 	r.POST("/api/frf", handler.CalculateFRF)
+	r.POST("/api/transient", handler.CalculateTransient)
 
 	r.Run(":8080")
 }

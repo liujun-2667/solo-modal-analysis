@@ -39,6 +39,7 @@ const props = defineProps<{
     modalResults: ModalResult[]
     selectedMode: number
     modeSelections: ModeSelection[]
+    transientDisplacements?: number[]
 }>()
 
 const container = ref<HTMLDivElement | null>(null)
@@ -76,6 +77,13 @@ const combinedModeShape = computed(() => {
         }
     })
     return shape
+})
+
+const currentDisplacements = computed(() => {
+    if (props.transientDisplacements && props.transientDisplacements.length > 0) {
+        return props.transientDisplacements
+    }
+    return combinedModeShape.value
 })
 
 const initScene = () => {
@@ -151,7 +159,7 @@ const updateDeformedShape = (factor: number) => {
     if (!deformedLine || !props.nodes.length) return
 
     const positions = deformedLine.geometry.attributes.position.array as Float32Array
-    const modeShape = combinedModeShape.value
+    const displacements = currentDisplacements.value
 
     let pointIndex = 0
     props.elements.forEach(elem => {
@@ -161,14 +169,14 @@ const updateDeformedShape = (factor: number) => {
             const nodeIdx1 = props.nodes.findIndex(n => n.id === elem.node1)
             const nodeIdx2 = props.nodes.findIndex(n => n.id === elem.node2)
 
-            positions[pointIndex * 3] = node1.x + (modeShape[nodeIdx1 * 6] || 0) * scaleFactor.value * factor
-            positions[pointIndex * 3 + 1] = node1.y + (modeShape[nodeIdx1 * 6 + 1] || 0) * scaleFactor.value * factor
-            positions[pointIndex * 3 + 2] = node1.z + (modeShape[nodeIdx1 * 6 + 2] || 0) * scaleFactor.value * factor
+            positions[pointIndex * 3] = node1.x + (displacements[nodeIdx1 * 6] || 0) * scaleFactor.value * factor
+            positions[pointIndex * 3 + 1] = node1.y + (displacements[nodeIdx1 * 6 + 1] || 0) * scaleFactor.value * factor
+            positions[pointIndex * 3 + 2] = node1.z + (displacements[nodeIdx1 * 6 + 2] || 0) * scaleFactor.value * factor
             pointIndex++
 
-            positions[pointIndex * 3] = node2.x + (modeShape[nodeIdx2 * 6] || 0) * scaleFactor.value * factor
-            positions[pointIndex * 3 + 1] = node2.y + (modeShape[nodeIdx2 * 6 + 1] || 0) * scaleFactor.value * factor
-            positions[pointIndex * 3 + 2] = node2.z + (modeShape[nodeIdx2 * 6 + 2] || 0) * scaleFactor.value * factor
+            positions[pointIndex * 3] = node2.x + (displacements[nodeIdx2 * 6] || 0) * scaleFactor.value * factor
+            positions[pointIndex * 3 + 1] = node2.y + (displacements[nodeIdx2 * 6 + 1] || 0) * scaleFactor.value * factor
+            positions[pointIndex * 3 + 2] = node2.z + (displacements[nodeIdx2 * 6 + 2] || 0) * scaleFactor.value * factor
             pointIndex++
         }
     })
@@ -179,12 +187,12 @@ const updateDeformedShape = (factor: number) => {
 const updateColor = () => {
     if (!deformedLine || !props.nodes.length) return
 
-    const modeShape = combinedModeShape.value
+    const displacements = currentDisplacements.value
     let maxDisp = 0
     props.nodes.forEach((_, idx) => {
-        const dx = Math.abs(modeShape[idx * 6] || 0)
-        const dy = Math.abs(modeShape[idx * 6 + 1] || 0)
-        const dz = Math.abs(modeShape[idx * 6 + 2] || 0)
+        const dx = Math.abs(displacements[idx * 6] || 0)
+        const dy = Math.abs(displacements[idx * 6 + 1] || 0)
+        const dz = Math.abs(displacements[idx * 6 + 2] || 0)
         maxDisp = Math.max(maxDisp, dx, dy, dz)
     })
 
@@ -196,14 +204,14 @@ const updateColor = () => {
             const nodeIdx2 = props.nodes.findIndex(n => n.id === elem.node2)
 
             const disp1 = Math.sqrt(
-                Math.pow(modeShape[nodeIdx1 * 6] || 0, 2) +
-                Math.pow(modeShape[nodeIdx1 * 6 + 1] || 0, 2) +
-                Math.pow(modeShape[nodeIdx1 * 6 + 2] || 0, 2)
+                Math.pow(displacements[nodeIdx1 * 6] || 0, 2) +
+                Math.pow(displacements[nodeIdx1 * 6 + 1] || 0, 2) +
+                Math.pow(displacements[nodeIdx1 * 6 + 2] || 0, 2)
             )
             const disp2 = Math.sqrt(
-                Math.pow(modeShape[nodeIdx2 * 6] || 0, 2) +
-                Math.pow(modeShape[nodeIdx2 * 6 + 1] || 0, 2) +
-                Math.pow(modeShape[nodeIdx2 * 6 + 2] || 0, 2)
+                Math.pow(displacements[nodeIdx2 * 6] || 0, 2) +
+                Math.pow(displacements[nodeIdx2 * 6 + 1] || 0, 2) +
+                Math.pow(displacements[nodeIdx2 * 6 + 2] || 0, 2)
             )
 
             const color1 = getColor(disp1 / maxDisp)
@@ -270,6 +278,11 @@ watch(scaleFactor, () => {
         updateDeformedShape(1)
     }
 })
+
+watch(() => props.transientDisplacements, () => {
+    updateColor()
+    updateDeformedShape(1)
+}, { deep: true })
 
 const handleResize = () => {
     if (!container.value) return

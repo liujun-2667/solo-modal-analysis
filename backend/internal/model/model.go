@@ -83,3 +83,25 @@ type FRFResponse struct {
     Amplitudes  []float64   `json:"amplitudes"`
     Resonances  []float64   `json:"resonances"`
 }
+
+type TransientRequest struct {
+    AnalysisRequest
+    ExcitationNode int     `json:"excitationNode" validate:"required,min=1"`
+    Direction      string  `json:"direction" validate:"required,oneof=X Y Z"`
+    WaveformType   string  `json:"waveformType" validate:"required,oneof=impulse step halfsine"`
+    Amplitude      float64 `json:"amplitude" validate:"required"`
+    Duration       float64 `json:"duration" validate:"required,gt=0"`
+    TimeStep       float64 `json:"timeStep" validate:"required,gt=0"`
+    TotalTime      float64 `json:"totalTime" validate:"required,gt=0"`
+    DampingRatio   float64 `json:"dampingRatio" validate:"gte=0,lte=1"`
+    ObservationNode int    `json:"observationNode" validate:"required,min=1"`
+    ObservationDirection string `json:"observationDirection" validate:"required,oneof=X Y Z"`
+}
+
+type TransientResponse struct {
+    Success        bool        `json:"success"`
+    Message        string      `json:"message"`
+    TimePoints     []float64   `json:"timePoints"`
+    Displacements  []float64   `json:"displacements"`
+    AllDisplacements [][]float64 `json:"allDisplacements"`
+}

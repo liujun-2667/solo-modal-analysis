@@ -292,3 +292,100 @@ func CalculateFRF(c *gin.Context) {
         Resonances:  resonances,
     })
 }
+
+func CalculateTransient(c *gin.Context) {
+    var request model.TransientRequest
+    if err := c.ShouldBindJSON(&request); err != nil {
+        c.JSON(http.StatusBadRequest, model.TransientResponse{
+            Success: false,
+            Message: "Invalid request: " + err.Error(),
+        })
+        return
+    }
+
+    K, M, _ := solver.AssembleGlobalMatrices(request.Nodes, request.Elements, request.Sections)
+    solver.ApplyConstraints(K, M, request.Constraints, request.Nodes)
+
+    numModes := 20
+    eigenPairs, _ := solver.SolveEigenvalue(K, M, numModes)
+
+    var eigenvalues []float64
+    var eigenvectors [][]float64
+    for _, pair := range eigenPairs {
+        eigenvalues = append(eigenvalues, pair.Eigenvalue)
+        normalizedMode := solver.NormalizeByMass(pair.Eigenvector, M)
+        eigenvectors = append(eigenvectors, normalizedMode)
+    }
+
+    directionIndex := 0
+    switch request.Direction {
+    case "Y":
+        directionIndex = 1
+    case "Z":
+        directionIndex = 2
+    }
+
+    observationDirIndex := 0
+    switch request.ObservationDirection {
+    case "Y":
+        observationDirIndex = 1
+    case "Z":
+        observationDirIndex = 2
+    }
+
+    excitationNodeIndex := -1
+    for i, node := range request.Nodes {
+        if node.ID == request.ExcitationNode {
+            excitationNodeIndex = i
+            break
+        }
+    }
+
+    if excitationNodeIndex == -1 {
+        c.JSON(http.StatusBadRequest, model.TransientResponse{
+            Success: false,
+            Message: "激励节点不存在",
+        })
+        return
+    }
+
+    observationNodeIndex := -1
+    for i, node := range request.Nodes {
+        if node.ID == request.ObservationNode {
+            observationNodeIndex = i
+            break
+        }
+    }
+
+    if observationNodeIndex == -1 {
+        c.JSON(http.StatusBadRequest, model.TransientResponse{
+            Success: false,
+            Message: "观测节点不存在",
+        })
+        return
+    }
+
+    timePoints, displacements, allDisplacements := solver.CalculateTransientResponse(
+        K, M,
+        eigenvalues,
+        eigenvectors,
+        excitationNodeIndex,
+        directionIndex,
+        request.WaveformType,
+        request.Amplitude,
+        request.Duration,
+        request.TimeStep,
+        request.TotalTime,
+        request.DampingRatio,
+        observationNodeIndex,
+        observationDirIndex,
+    )
+
+    c.JSON(http.StatusOK, model.TransientResponse{
+        Success:           true,
+        Message:           "瞬态响应计算完成",
+        TimePoints:        timePoints,
+        Displacements:     displacements,
+        AllDisplacements:  allDisplacements,
+    })
+}

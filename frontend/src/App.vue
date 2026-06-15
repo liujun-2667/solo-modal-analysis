@@ -27,11 +27,19 @@
                         :modalResults="modalResults"
                         :theoryValues="theoryValues"
                         :selectedMode="selectedMode"
+                        :nodes="nodes"
+                        :elements="elements"
+                        :sections="sections"
+                        :constraints="constraints"
                         @select="handleModeSelect"
                     />
                     <div v-else class="empty-state">
                         <p>请先定义结构模型并运行分析</p>
                     </div>
+                </el-card>
+                
+                <el-card title="模态MAC矩阵">
+                    <MACMatrix :currentModalResults="modalResults" />
                 </el-card>
             </div>
 
@@ -43,10 +51,20 @@
                         :modalResults="modalResults"
                         :selectedMode="selectedMode"
                         :modeSelections="modeSelections"
+                        :transientDisplacements="transientDisplacements"
                     />
                 </el-card>
                 <el-card title="模态选择">
                     <ModeSelector :modalResults="modalResults" @update="handleModeSelectionsUpdate" />
+                </el-card>
+                <el-card title="瞬态响应分析">
+                    <TransientAnalysis
+                        :nodes="nodes"
+                        :elements="elements"
+                        :sections="sections"
+                        :constraints="constraints"
+                        @animationUpdate="handleTransientAnimationUpdate"
+                    />
                 </el-card>
             </div>
         </div>
@@ -68,6 +86,8 @@ import ModalResultTable from './components/ModalResultTable.vue'
 import Modal3DViewer from './components/Modal3DViewer.vue'
 import ModeSelector from './components/ModeSelector.vue'
 import PresetSelector from './components/PresetSelector.vue'
+import MACMatrix from './components/MACMatrix.vue'
+import TransientAnalysis from './components/TransientAnalysis.vue'
 import { api } from './utils/api'
 import type { Node, Element, Section, Constraint, ModalResult, TheoryValue, ModeSelection, Preset } from './types'
 
@@ -82,10 +102,15 @@ const modeSelections = ref<ModeSelection[]>([])
 const showPresetSelector = ref(false)
 const message = ref('')
 const messageType = ref<'success' | 'warning' | 'error' | 'info'>('success')
+const transientDisplacements = ref<number[]>([])
 
 const analysisParams = reactive({
     numModes: 10
 })
+
+const handleTransientAnimationUpdate = (displacements: number[]) => {
+    transientDisplacements.value = displacements
+}
 
 const handleModelUpdate = (data: { nodes: Node[], elements: Element[], sections: Section[], constraints: Constraint[] }) => {
     nodes.value = data.nodes

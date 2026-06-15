@@ -90,6 +90,31 @@ export interface FRFResponse {
     resonances: number[]
 }
 
+export interface TransientRequest {
+    nodes: Node[]
+    elements: Element[]
+    sections: Section[]
+    constraints: Constraint[]
+    excitationNode: number
+    direction: string
+    waveformType: 'impulse' | 'step' | 'halfsine'
+    amplitude: number
+    duration: number
+    timeStep: number
+    totalTime: number
+    dampingRatio: number
+    observationNode: number
+    observationDirection: string
+}
+
+export interface TransientResponse {
+    success: boolean
+    message: string
+    timePoints: number[]
+    displacements: number[]
+    allDisplacements: number[][]
+}
+
 export interface ModeSelection {
     modeIndex: number
     enabled: boolean
