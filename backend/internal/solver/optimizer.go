@@ -207,9 +207,9 @@ func SolveOptimization(request model.OptimizationRequest) (*model.OptimizationRe
 		}
 		
 		grad := computeGradient(x, request, enabledDVs)
-		constraintGrads := computeConstraintGradients(x, request, enabledDVs)
+		constraintViolations = evaluateConstraints(freqs, request.FrequencyConstraints)
 		
-		x = updateDesignVariables(x, grad, constraintGrads, lb, ub, request.FrequencyConstraints, freqs)
+		x = updateDesignVariables(x, grad, constraintViolations, lb, ub, request.FrequencyConstraints, freqs)
 		
 		for i := range x {
 			if x[i] < lb[i] {
@@ -373,7 +373,7 @@ func updateDesignVariables(x, grad, constraintViolations []float64, lb, ub []flo
 		newX[i] -= stepSize * descent
 	}
 	
-	for i, fc := range constraints {
+	for _, fc := range constraints {
 		if fc.ModeIndex-1 >= len(freqs) {
 			continue
 		}

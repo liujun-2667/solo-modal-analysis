@@ -3,7 +3,7 @@ FROM golang:1.21-alpine AS backend-build
 WORKDIR /app
 
 COPY backend/ .
-RUN go mod tidy && go mod download
+RUN go mod tidy
 RUN go build -o modal-analysis .
 
 FROM node:20-alpine AS frontend-build
@@ -15,7 +15,7 @@ COPY .npmrc ./
 RUN npm install
 
 COPY frontend/ .
-RUN npm run build
+RUN NODE_OPTIONS="--max-old-space-size=1024" npm run build
 
 FROM nginx:alpine
 

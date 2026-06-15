@@ -424,13 +424,6 @@ func CalculateFRF(K, M *Matrix, eigenvalues []float64, eigenvectors [][]float64,
     return frequencies, amplitudes, resonances
 }
 
-func min(a, b int) int {
-    if a < b {
-        return a
-    }
-    return b
-}
-
 func GetExcitationForce(waveformType string, amplitude, duration, time float64) float64 {
     switch waveformType {
     case "impulse":

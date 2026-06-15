@@ -179,7 +179,6 @@ func createPortalFrame() Preset {
 }
 
 func createThreeSpanBeam() Preset {
-    L := 10.0
     E := 2.1e11
     rho := 7850.0
     A := 0.01
